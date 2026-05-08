@@ -1,0 +1,23 @@
+Senior Backend Engineer — Fintech Payments Platform
+
+About us:
+We're a fast-growing fintech startup processing $2B+ in annual transactions for 5M+ users.
+
+Responsibilities:
+- Design and own end-to-end ownership of payment processing microservices
+- Lead a team of 5 engineers to deliver data-driven decision making across billing systems
+- Reduce API latency by 30% through profiling and architectural improvements
+- Partner with cross-functional collaboration across product, infra, and compliance teams
+
+Requirements:
+- 5+ years of backend engineering experience
+- Python (required), PostgreSQL (required), Docker (required)
+- Experience with PCI compliance and financial systems
+- Strong written communication skills and ability to mentor junior engineers
+- CI/CD pipelines, Agile / Scrum methodologies
+
+Nice to have:
+- Kubernetes, Terraform
+- AWS Solutions Architect certification
+- Machine Learning (ML) experience for fraud detection models
+- ReactJS for internal tooling
