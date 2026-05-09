@@ -72,7 +72,7 @@ export default function OnboardingPage() {
     <div className="min-h-screen flex flex-col bg-background">
       {/* Header */}
       <header className="px-6 py-4 border-b border-border flex items-center justify-between">
-        <Link href="/" className="text-sm font-bold">🔨 Resume-Forge</Link>
+        <Link href="/" className="text-xl font-extrabold tracking-tight">Resume-Forge</Link>
         <span className="text-xs text-muted-foreground">{currentStep + 1} / {steps.length}</span>
       </header>
 

@@ -36,7 +36,7 @@ export default function SignInPage() {
       {/* Left: Auth form */}
       <div className="flex-1 flex flex-col justify-center px-8 md:px-16 py-16 max-w-lg">
         <Link href="/" className="text-sm font-bold mb-12 inline-block">
-          🔨 Resume-Forge
+          Resume-Forge
         </Link>
 
         {/* New / Returning toggle */}
