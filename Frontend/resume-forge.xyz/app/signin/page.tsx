@@ -13,19 +13,50 @@ export default function SignInPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [passwordError, setPasswordError] = useState("");
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [sent, setSent] = useState(false);
   const [isNewUser, setIsNewUser] = useState(false);
 
+  function validate() {
+    const e: Record<string, string> = {};
+
+    if (!email.trim()) {
+      e.email = "Email is required.";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      e.email = "Enter a valid email address.";
+    }
+
+    if (!password) {
+      e.password = "Password is required.";
+    } else if (password.length < 8) {
+      e.password = "Password must be at least 8 characters.";
+    } else if (!/[A-Z]/.test(password)) {
+      e.password = "Include at least one uppercase letter.";
+    } else if (!/[0-9]/.test(password)) {
+      e.password = "Include at least one number.";
+    }
+
+    if (isNewUser) {
+      if (!confirmPassword) {
+        e.confirmPassword = "Please confirm your password.";
+      } else if (password !== confirmPassword) {
+        e.confirmPassword = "Passwords do not match.";
+      }
+    }
+
+    return e;
+  }
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (isNewUser && password !== confirmPassword) {
-      setPasswordError("Passwords do not match.");
+    const errs = validate();
+    if (Object.keys(errs).length > 0) {
+      setErrors(errs);
       return;
     }
-    setPasswordError("");
+    setErrors({});
     setSent(true);
     setTimeout(() => router.push(isNewUser ? "/onboarding" : "/dashboard"), 1500);
   }
@@ -86,10 +117,10 @@ export default function SignInPage() {
                 type="email"
                 placeholder="you@company.com"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="font-mono text-sm h-11 border-border focus:border-accent focus:ring-accent"
+                onChange={(e) => { setEmail(e.target.value); setErrors((p) => ({ ...p, email: "" })); }}
+                className={`font-mono text-sm h-11 border-border focus:border-accent focus:ring-accent ${errors.email ? "border-red-500" : ""}`}
               />
+              {errors.email && <p className="text-xs text-red-500">{errors.email}</p>}
             </div>
 
             <div className="flex flex-col gap-2">
@@ -102,9 +133,8 @@ export default function SignInPage() {
                   type={showPassword ? "text" : "password"}
                   placeholder="••••••••"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  className="font-mono text-sm h-11 border-border focus:border-accent focus:ring-accent pr-10"
+                  onChange={(e) => { setPassword(e.target.value); setErrors((p) => ({ ...p, password: "" })); }}
+                  className={`font-mono text-sm h-11 border-border focus:border-accent focus:ring-accent pr-10 ${errors.password ? "border-red-500" : ""}`}
                 />
                 <button
                   type="button"
@@ -126,6 +156,7 @@ export default function SignInPage() {
                   )}
                 </button>
               </div>
+              {errors.password && <p className="text-xs text-red-500">{errors.password}</p>}
             </div>
 
             {isNewUser && (
@@ -139,9 +170,8 @@ export default function SignInPage() {
                     type={showConfirm ? "text" : "password"}
                     placeholder="••••••••"
                     value={confirmPassword}
-                    onChange={(e) => { setConfirmPassword(e.target.value); setPasswordError(""); }}
-                    required
-                    className={`font-mono text-sm h-11 border-border focus:border-accent focus:ring-accent pr-10 ${passwordError ? "border-red-500" : ""}`}
+                    onChange={(e) => { setConfirmPassword(e.target.value); setErrors((p) => ({ ...p, confirmPassword: "" })); }}
+                    className={`font-mono text-sm h-11 border-border focus:border-accent focus:ring-accent pr-10 ${errors.confirmPassword ? "border-red-500" : ""}`}
                   />
                   <button
                     type="button"
@@ -163,8 +193,8 @@ export default function SignInPage() {
                     )}
                   </button>
                 </div>
-                {passwordError && (
-                  <p className="text-xs text-red-500">{passwordError}</p>
+                {errors.confirmPassword && (
+                  <p className="text-xs text-red-500">{errors.confirmPassword}</p>
                 )}
               </div>
             )}
