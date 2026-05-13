@@ -25,10 +25,10 @@ export function Navbar() {
     >
       <Link href="/" className="flex items-center gap-2 no-underline">
         <span
-          className="font-bold text-sm tracking-tight"
+          className="font-extrabold text-xl tracking-tight"
           style={{ color: "oklch(0.96 0.005 80)" }}
         >
-          🔨 Resume-Forge
+          Resume-Forge
         </span>
       </Link>
 
