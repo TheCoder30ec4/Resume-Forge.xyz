@@ -7,23 +7,57 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
 
-const recentJobs = [
-  "◇ Senior FE @ Linear",
-  "◇ Staff Eng @ Vercel",
-  "◇ Product Eng @ Ramp",
-  "◇ FE Eng @ Notion",
-];
 
 export default function SignInPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [sent, setSent] = useState(false);
   const [isNewUser, setIsNewUser] = useState(false);
 
-  function handleMagicLink(e: React.FormEvent) {
+  function validate() {
+    const e: Record<string, string> = {};
+
+    if (!email.trim()) {
+      e.email = "Email is required.";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      e.email = "Enter a valid email address.";
+    }
+
+    if (!password) {
+      e.password = "Password is required.";
+    } else if (password.length < 8) {
+      e.password = "Password must be at least 8 characters.";
+    } else if (!/[A-Z]/.test(password)) {
+      e.password = "Include at least one uppercase letter.";
+    } else if (!/[0-9]/.test(password)) {
+      e.password = "Include at least one number.";
+    }
+
+    if (isNewUser) {
+      if (!confirmPassword) {
+        e.confirmPassword = "Please confirm your password.";
+      } else if (password !== confirmPassword) {
+        e.confirmPassword = "Passwords do not match.";
+      }
+    }
+
+    return e;
+  }
+
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    const errs = validate();
+    if (Object.keys(errs).length > 0) {
+      setErrors(errs);
+      return;
+    }
+    setErrors({});
     setSent(true);
-    // Simulate: new user → onboarding, returning → dashboard
     setTimeout(() => router.push(isNewUser ? "/onboarding" : "/dashboard"), 1500);
   }
 
@@ -35,8 +69,10 @@ export default function SignInPage() {
     <div className="min-h-screen flex">
       {/* Left: Auth form */}
       <div className="flex-1 flex flex-col justify-center px-8 md:px-16 py-16 max-w-lg">
-        <Link href="/" className="text-sm font-bold mb-12 inline-block">
-          🔨 Resume-Forge
+        <Link href="/" className="mb-12 inline-block">
+          <span className="text-4xl font-extrabold tracking-tight">
+            Resume-<span style={{ color: "#f59e0b" }}>Forge</span>
+          </span>
         </Link>
 
         {/* New / Returning toggle */}
@@ -64,14 +100,14 @@ export default function SignInPage() {
         </h1>
         <p className="text-sm text-muted-foreground mb-8">
           {sent
-            ? `Check your inbox. Redirecting you ${isNewUser ? "to onboarding" : "to your dashboard"}…`
+            ? `Redirecting you ${isNewUser ? "to onboarding" : "to your dashboard"}…`
             : isNewUser
             ? "Start free. No credit card required."
-            : "Magic link to your inbox."}
+            : "Enter your credentials to continue."}
         </p>
 
         {!sent ? (
-          <form onSubmit={handleMagicLink} className="flex flex-col gap-4">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <div className="flex flex-col gap-2">
               <Label htmlFor="email" className="text-xs uppercase tracking-widest">
                 Email
@@ -81,21 +117,97 @@ export default function SignInPage() {
                 type="email"
                 placeholder="you@company.com"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="font-mono text-sm h-11 border-border focus:border-accent focus:ring-accent"
+                onChange={(e) => { setEmail(e.target.value); setErrors((p) => ({ ...p, email: "" })); }}
+                className={`font-mono text-sm h-11 border-border focus:border-accent focus:ring-accent ${errors.email ? "border-red-500" : ""}`}
               />
+              {errors.email && <p className="text-xs text-red-500">{errors.email}</p>}
             </div>
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="password" className="text-xs uppercase tracking-widest">
+                Password
+              </Label>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => { setPassword(e.target.value); setErrors((p) => ({ ...p, password: "" })); }}
+                  className={`font-mono text-sm h-11 border-border focus:border-accent focus:ring-accent pr-10 ${errors.password ? "border-red-500" : ""}`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                  tabIndex={-1}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? (
+                    <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24" strokeLinecap="round" strokeLinejoin="round"/>
+                      <line x1="1" y1="1" x2="23" y2="23" strokeLinecap="round"/>
+                    </svg>
+                  ) : (
+                    <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" strokeLinecap="round" strokeLinejoin="round"/>
+                      <circle cx="12" cy="12" r="3"/>
+                    </svg>
+                  )}
+                </button>
+              </div>
+              {errors.password && <p className="text-xs text-red-500">{errors.password}</p>}
+            </div>
+
+            {isNewUser && (
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="confirm-password" className="text-xs uppercase tracking-widest">
+                  Confirm Password
+                </Label>
+                <div className="relative">
+                  <Input
+                    id="confirm-password"
+                    type={showConfirm ? "text" : "password"}
+                    placeholder="••••••••"
+                    value={confirmPassword}
+                    onChange={(e) => { setConfirmPassword(e.target.value); setErrors((p) => ({ ...p, confirmPassword: "" })); }}
+                    className={`font-mono text-sm h-11 border-border focus:border-accent focus:ring-accent pr-10 ${errors.confirmPassword ? "border-red-500" : ""}`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirm((v) => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                    tabIndex={-1}
+                    aria-label={showConfirm ? "Hide password" : "Show password"}
+                  >
+                    {showConfirm ? (
+                      <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24" strokeLinecap="round" strokeLinejoin="round"/>
+                        <line x1="1" y1="1" x2="23" y2="23" strokeLinecap="round"/>
+                      </svg>
+                    ) : (
+                      <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" strokeLinecap="round" strokeLinejoin="round"/>
+                        <circle cx="12" cy="12" r="3"/>
+                      </svg>
+                    )}
+                  </button>
+                </div>
+                {errors.confirmPassword && (
+                  <p className="text-xs text-red-500">{errors.confirmPassword}</p>
+                )}
+              </div>
+            )}
 
             <Button
               type="submit"
-              className="h-11 font-bold text-sm transition-colors duration-150 cursor-pointer border-0"
+              className="h-11 font-bold text-sm transition-colors duration-150 cursor-pointer border-0 mt-1"
               style={{
                 backgroundColor: "oklch(0.22 0.03 55)",
                 color: "oklch(0.96 0.005 80)",
               }}
             >
-              Send link →
+              {isNewUser ? "Create account →" : "Sign in →"}
             </Button>
 
             <div className="flex items-center gap-3 my-1">
@@ -139,33 +251,43 @@ export default function SignInPage() {
         )}
       </div>
 
-      {/* Right: Social proof — espresso brown panel */}
+      {/* Right: Brand panel */}
       <div
-        className="hidden md:flex flex-1 flex-col justify-center px-12 py-16"
+        className="hidden md:flex flex-1 flex-col justify-center px-12 py-16 relative overflow-hidden"
         style={{ backgroundColor: "oklch(0.22 0.03 55)" }}
       >
-        <div className="mb-4">
-          <span className="inline-flex items-center gap-2 text-xs" style={{ color: "oklch(0.70 0.02 65)" }}>
-            <span className="w-2 h-2 rounded-full bg-accent pulse-dot inline-block" />
-            live
-          </span>
-        </div>
-        <p className="text-sm mb-4 uppercase tracking-widest" style={{ color: "oklch(0.60 0.02 60)" }}>
-          last week&apos;s jobs:
+        {/* Background texture — large faint wordmark */}
+        <p
+          className="absolute -bottom-6 -right-4 text-[11rem] font-extrabold leading-none select-none pointer-events-none tracking-tighter"
+          style={{ color: "oklch(0.17 0.03 55)" }}
+          aria-hidden="true"
+        >
+          RF
         </p>
-        <ul className="flex flex-col gap-3 mb-12">
-          {recentJobs.map((job, i) => (
-            <li key={i} className="text-lg font-bold tracking-tight" style={{ color: "oklch(0.92 0.005 80)" }}>
-              {job}
-            </li>
-          ))}
-        </ul>
 
-        <div className="pt-8" style={{ borderTop: "1px solid oklch(0.30 0.03 55)" }}>
-          <p className="text-base italic leading-relaxed mb-4" style={{ color: "oklch(0.78 0.01 70)" }}>
-            &ldquo;4 résumés. ~3 minutes total.&rdquo;
+        {/* Main content */}
+        <div className="relative z-10">
+          <p
+            className="text-4xl font-extrabold tracking-tighter leading-tight mb-6"
+            style={{ color: "oklch(0.96 0.005 80)" }}
+          >
+            Your résumé,<br />
+            <span style={{ color: "oklch(0.75 0.12 60)" }}>forged to fit.</span>
           </p>
-          <p className="text-xs" style={{ color: "oklch(0.55 0.02 60)" }}>— alex m., shipped from beta</p>
+
+          <div className="flex flex-col gap-4">
+            {[
+              { stat: "47s", label: "Average time to generate" },
+              { stat: "94", label: "Average ATS score" },
+              { stat: "0%", label: "Hallucinated experience" },
+            ].map(({ stat, label }) => (
+              <div key={stat} className="flex items-center gap-4" style={{ borderLeft: "2px solid oklch(0.40 0.05 55)", paddingLeft: "1rem" }}>
+                <span className="text-2xl font-extrabold tabular-nums" style={{ color: "oklch(0.96 0.005 80)" }}>{stat}</span>
+                <span className="text-xs" style={{ color: "oklch(0.60 0.02 60)" }}>{label}</span>
+              </div>
+            ))}
+          </div>
+
         </div>
       </div>
     </div>

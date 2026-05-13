@@ -591,7 +591,7 @@ export default function OnboardingPage() {
       {/* Header */}
       <header className="px-6 py-4 border-b border-border flex items-center justify-between">
         <Link href="/" className="text-xl font-extrabold tracking-tight">Resume-Forge</Link>
-        <span className="text-xs text-muted-foreground font-mono">{currentStep + 1} / {steps.length}</span>
+        <span className="text-xs text-muted-foreground">{currentStep + 1} / {steps.length}</span>
       </header>
 
       <div className="flex-1 flex flex-col md:flex-row max-w-4xl mx-auto w-full px-6 py-12 gap-12">
