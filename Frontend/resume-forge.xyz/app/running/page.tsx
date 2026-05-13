@@ -36,7 +36,7 @@ export default function RunningPage() {
   useEffect(() => {
     if (currentStage >= stages.length) {
       setDone(true);
-      setTimeout(() => router.push("/shipped"), 800);
+      setTimeout(() => router.push("/editor"), 800);
       return;
     }
     const delay = currentStage === 1 ? 4000 : 2000;
