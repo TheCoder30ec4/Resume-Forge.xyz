@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 from langchain_core.messages import HumanMessage, AIMessage
 
-from app.Node.GithubNode import Node as github_node_module
+from Backend.workflow.Node.GithubNode import Node as github_node_module
 
 
 _FAKE_REPOS = [
@@ -66,9 +66,18 @@ def _make_synthetic_repo(tmp_path: Path, name: str) -> Path:
 
 
 async def test_fetch_node_uses_get_github_repos(monkeypatch):
-    monkeypatch.setattr(github_node_module, "get_github_repos", lambda: _FAKE_REPOS)
+    """_fetch_node fetches the user-granted repos via get_github_repos(names, token)."""
+    captured = {}
+
+    def fake_get(names, token):
+        captured["names"], captured["token"] = names, token
+        return _FAKE_REPOS
+
+    monkeypatch.setattr(github_node_module, "get_github_repos", fake_get)
     state = {
         "JDAnalysis": "{}",
+        "GrantedRepos": ["fake-user/payment-service", "fake-user/infra-toolkit"],
+        "GithubToken": "tok-123",
         "AllRepos": [],
         "SelectedNames": [],
         "Summaries": [],
@@ -76,10 +85,30 @@ async def test_fetch_node_uses_get_github_repos(monkeypatch):
     }
     result = await github_node_module._fetch_node(state)
     assert result["AllRepos"] == _FAKE_REPOS
+    assert captured["names"] == ["fake-user/payment-service", "fake-user/infra-toolkit"]
+    assert captured["token"] == "tok-123"
+
+
+async def test_select_node_summarizes_both_when_only_two_granted(monkeypatch, sample_jd_analysis):
+    """With exactly 2 repos the user already curated, skip the LLM and use both."""
+    class ExplodingAgent:
+        async def ainvoke(self, _):
+            raise AssertionError("select agent must not be called for a 2-repo set")
+
+    monkeypatch.setattr(github_node_module, "GithubSelectAgent", ExplodingAgent())
+    state = {
+        "JDAnalysis": sample_jd_analysis,
+        "AllRepos": _FAKE_REPOS[:2],
+        "SelectedNames": [],
+        "Summaries": [],
+        "user_input": None,
+    }
+    result = await github_node_module._select_node(state)
+    assert result["SelectedNames"] == ["payment-service", "ml-tutorial"]
 
 
 async def test_select_node_falls_back_when_llm_returns_garbage(monkeypatch, sample_jd_analysis):
-    """If GithubSelectAgent returns non-JSON, we fall back to first 3 repos."""
+    """With >2 repos the LLM picks; on non-JSON output we fall back to the first 4."""
     class StubAgent:
         async def ainvoke(self, _):
             return {"messages": [AIMessage(content="not valid json")]}
@@ -109,6 +138,7 @@ async def test_select_node_handles_no_repos(sample_jd_analysis):
 
 
 async def test_select_node_parses_valid_json(monkeypatch, sample_jd_analysis):
+    """With >2 repos the LLM narrows the set to the most JD-relevant ones."""
     class StubAgent:
         async def ainvoke(self, _):
             return {"messages": [AIMessage(content='["payment-service", "infra-toolkit"]')]}
@@ -170,7 +200,7 @@ async def test_summarize_one_walks_synthetic_repo(monkeypatch, tmp_path):
 
 async def test_subgraph_runs_end_to_end(monkeypatch, tmp_path, sample_jd_analysis):
     """Full sub-graph: fetch (mocked) → select (stubbed) → summarize (stubbed agent + real fs)."""
-    monkeypatch.setattr(github_node_module, "get_github_repos", lambda: _FAKE_REPOS)
+    monkeypatch.setattr(github_node_module, "get_github_repos", lambda names, token: _FAKE_REPOS)
 
     class SelectStub:
         async def ainvoke(self, _):
@@ -206,6 +236,9 @@ async def test_subgraph_runs_end_to_end(monkeypatch, tmp_path, sample_jd_analysi
         "JD": "...",
         "user_input": None,
         "session_id": "t",
+        "LinkedinURL": "https://www.linkedin.com/in/t",
+        "GithubRepos": ["fake-user/payment-service", "fake-user/infra-toolkit"],
+        "GithubToken": None,
         "JDAnalysis": sample_jd_analysis,
         "LinkedinSummary": "",
         "GithubProjectSummary": [],

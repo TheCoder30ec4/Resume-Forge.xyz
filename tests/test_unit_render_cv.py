@@ -1,11 +1,12 @@
 """Unit tests for the render_cv tool — YAML assembly and rendercv invocation."""
+import json
 import shutil
 import subprocess
 from pathlib import Path
 
 import pytest
 
-from app.tools.render_cv import assemble_yaml, save_yaml, render_cv
+from Backend.workflow.tools.render_cv import assemble_yaml, save_yaml, render_cv
 
 
 def test_assemble_yaml_concatenates_template(sample_resume_yaml):
@@ -22,6 +23,28 @@ def test_assemble_yaml_strips_markdown_fences(sample_resume_yaml):
     full = assemble_yaml(fenced)
     assert "```" not in full
     assert full.startswith("cv:")
+
+
+def test_assemble_yaml_converts_writer_json_to_cv_yaml():
+    writer_json = json.dumps({
+        "cv": {
+            "name": "Varun Test",
+            "sections": {
+                "summary": ["Backend engineer focused on Python APIs."],
+                "skills": [
+                    {"label": "Languages", "details": "Python, SQL"},
+                ],
+            },
+        },
+    })
+
+    full = assemble_yaml(writer_json)
+
+    assert full.startswith("cv:")
+    assert "name: Varun Test" in full
+    assert "summary:" in full
+    assert "design:" in full
+    assert '"cv"' not in full
 
 
 def test_save_yaml_writes_to_output_dir(sample_resume_yaml, tmp_path, monkeypatch):

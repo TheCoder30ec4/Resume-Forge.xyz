@@ -2,7 +2,7 @@
 import json
 import pytest
 
-from app.Node.ATSValidatorNode.Node import ATSValidatorNode, _extract_keywords, _keyword_in_text
+from Backend.workflow.Node.ATSValidatorNode.Node import ATSValidatorNode, _extract_keywords, _keyword_in_text
 
 
 def test_extract_keywords_pulls_all_categories(sample_jd_analysis):

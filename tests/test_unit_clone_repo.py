@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from app.tools.clone_repo import clone_repo, cleanup_repo
+from Backend.workflow.tools.clone_repo import clone_repo, cleanup_repo
 
 
 # Use the smallest stable public repo we can — the empty test repo from GitHub.

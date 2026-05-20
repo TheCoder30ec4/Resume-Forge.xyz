@@ -28,12 +28,11 @@ Nice to have:
 
 @requires_groq
 async def test_jd_agent_produces_valid_json():
-    from app.Node.JDNode.Agent import JDAgent
+    from Backend.workflow.Node.JDNode.Agent import JDAgent
     result = await JDAgent.ainvoke(
         {"messages": [HumanMessage(content=f"<job_description>\n{_SAMPLE_JD}\n</job_description>")]}
     )
-    raw = result["messages"][-1].content
-    parsed = json.loads(raw)
+    parsed = result["structured_response"].model_dump()
     assert "role_identity" in parsed
     assert "skills" in parsed
     assert "Python" in parsed["skills"]["hard_skills_required"]
@@ -43,18 +42,18 @@ async def test_jd_agent_produces_valid_json():
 
 @requires_groq
 async def test_jd_agent_extracts_role_level():
-    from app.Node.JDNode.Agent import JDAgent
+    from Backend.workflow.Node.JDNode.Agent import JDAgent
     result = await JDAgent.ainvoke(
         {"messages": [HumanMessage(content=f"<job_description>\n{_SAMPLE_JD}\n</job_description>")]}
     )
-    parsed = json.loads(result["messages"][-1].content)
+    parsed = result["structured_response"].model_dump()
     assert parsed["role_identity"]["role_level"] == "senior"
-    assert parsed["role_identity"]["domain"] in ["fintech", "payments", "Fintech", "Financial Services"]
+    assert parsed["role_identity"]["domain"].lower() in ["fintech", "payments", "financial services"]
 
 
 @requires_groq
 async def test_gap_analysis_agent_runs(sample_jd_analysis):
-    from app.Node.GapAnalysisNode.Agent import GapAnalysisAgent
+    from Backend.workflow.Node.GapAnalysisNode.Agent import GapAnalysisAgent
     user_input = (
         f"## JD Analysis\n{sample_jd_analysis}"
         f"\n\n## LinkedIn Summary\n5 years backend at Acme. Python, Django, PostgreSQL, Docker."
@@ -70,8 +69,8 @@ async def test_gap_analysis_agent_runs(sample_jd_analysis):
 
 
 @requires_groq
-async def test_resume_writer_produces_yaml(sample_jd_analysis):
-    from app.Node.ResumeWriteNode.Agent import ResumeWriteAgent
+async def test_resume_writer_produces_json(sample_jd_analysis):
+    from Backend.workflow.Node.ResumeWriteNode.Agent import ResumeWriteAgent
     sections = [
         f"## JD Analysis\n{sample_jd_analysis}",
         "## LinkedIn Summary\nVarun, 3 years backend, Python/PostgreSQL/Docker.",
@@ -81,7 +80,7 @@ async def test_resume_writer_produces_yaml(sample_jd_analysis):
     result = await ResumeWriteAgent.ainvoke(
         {"messages": [HumanMessage(content="\n\n".join(sections))]}
     )
-    yaml_text = result["messages"][-1].content
-    assert "cv:" in yaml_text
-    assert "name:" in yaml_text
-    assert "design:" not in yaml_text  # writer must NOT emit design block
+    parsed = json.loads(result["messages"][-1].content)
+    assert "cv" in parsed
+    assert "name" in parsed["cv"]
+    assert "design" not in parsed  # writer must NOT emit design block
