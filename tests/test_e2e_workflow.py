@@ -13,13 +13,14 @@ from pathlib import Path
 import pytest
 from langchain_core.messages import AIMessage
 
-import app.workflow as workflow_module
-from app.Node.JDNode import Node as jd_node_module
-from app.Node.LinkedinNode import Node as linkedin_node_module
-from app.Node.GithubNode import Node as github_node_module
-from app.Node.GapAnalysisNode import Node as gap_node_module
-from app.Node.ResumeWriteNode import Node as write_node_module
-from app.Node.UserReviewNode import Node as review_node_module
+import Backend.workflow.workflow as workflow_module
+from Backend.workflow.Node.JDNode import Node as jd_node_module
+from Backend.workflow.Node.JDNode.Schema import JDAnalysis
+from Backend.workflow.Node.LinkedinNode import Node as linkedin_node_module
+from Backend.workflow.Node.GithubNode import Node as github_node_module
+from Backend.workflow.Node.GapAnalysisNode import Node as gap_node_module
+from Backend.workflow.Node.ResumeWriteNode import Node as write_node_module
+from Backend.workflow.Node.UserReviewNode import Node as review_node_module
 
 
 pytestmark = pytest.mark.e2e
@@ -131,12 +132,31 @@ class _StubAgent:
         return {"messages": [AIMessage(content=self._content)]}
 
 
+class _StructuredStubAgent:
+    """Stub for agents with `response_format` — returns a `structured_response`.
+
+    JDAgent uses Pydantic structured output, so JDNode reads
+    `result["structured_response"]` rather than the message content.
+    """
+    def __init__(self, structured):
+        self._structured = structured
+
+    async def ainvoke(self, _state):
+        return {
+            "messages": [AIMessage(content="")],
+            "structured_response": self._structured,
+        }
+
+
 @pytest.fixture
 def initial_state():
     return {
         "JD": "Senior Backend Engineer at fintech needing Python, PostgreSQL, Docker, FastAPI, Kubernetes.",
         "user_input": None,
         "session_id": "e2e-test",
+        "LinkedinURL": "https://www.linkedin.com/in/e2e-test-user",
+        "GithubRepos": ["u/payment-svc", "u/data-pipeline"],
+        "GithubToken": None,
         "JDAnalysis": "",
         "LinkedinSummary": "",
         "GithubProjectSummary": [],
@@ -157,23 +177,39 @@ def initial_state():
 @pytest.fixture
 def stub_all_agents(monkeypatch):
     """Stub every agent + tool so the test is hermetic."""
-    monkeypatch.setattr(jd_node_module, "JDAgent", _StubAgent(_JD_ANALYSIS))
+    monkeypatch.setattr(
+        jd_node_module, "JDAgent",
+        _StructuredStubAgent(JDAnalysis.model_validate_json(_JD_ANALYSIS)),
+    )
 
+    # LinkedinNode fetches the profile deterministically, then the agent analyzes it.
+    monkeypatch.setattr(
+        linkedin_node_module, "get_linkedin",
+        lambda _url: [{"summary": "Backend engineer", "experience": [], "skills": ["Python"]}],
+    )
     monkeypatch.setattr(linkedin_node_module, "LinkedinAgent", _StubAgent(_LINKEDIN_SUMMARY))
 
-    # Github sub-workflow: stub all three steps
-    monkeypatch.setattr(github_node_module, "get_github_repos", lambda: [
+    # Github sub-workflow: user granted 2 repos → fetched directly, no LLM select.
+    monkeypatch.setattr(github_node_module, "get_github_repos", lambda _names, _token: [
         {
-            "name": "payment-svc",
+            "name": "u/payment-svc",
             "description": "...",
             "languages": ["Python"],
             "topics": [],
             "stars": 100,
             "url": "https://github.com/u/payment-svc",
             "readme_excerpt": "...",
-        }
+        },
+        {
+            "name": "u/data-pipeline",
+            "description": "...",
+            "languages": ["Python"],
+            "topics": [],
+            "stars": 50,
+            "url": "https://github.com/u/data-pipeline",
+            "readme_excerpt": "...",
+        },
     ])
-    monkeypatch.setattr(github_node_module, "GithubSelectAgent", _StubAgent('["payment-svc"]'))
 
     async def fake_clone(_url):
         # Make a temp dir that exists but is empty; the agent is stubbed anyway
@@ -204,9 +240,11 @@ async def test_workflow_passes_ats_on_first_attempt(monkeypatch, stub_all_agents
     workflow = workflow_module.build_workflow()
     final = await workflow.ainvoke(initial_state)
 
-    assert final["JDAnalysis"] == _JD_ANALYSIS
+    # JDNode serializes the structured response, so compare semantically (key
+    # order / null fields differ from the hand-written _JD_ANALYSIS string).
+    assert json.loads(final["JDAnalysis"]) == JDAnalysis.model_validate_json(_JD_ANALYSIS).model_dump()
     assert final["LinkedinSummary"] == _LINKEDIN_SUMMARY
-    assert len(final["GithubProjectSummary"]) == 1
+    assert len(final["GithubProjectSummary"]) == 2
     assert final["GapAnalysis"] == _GAP_ANALYSIS
     assert final["ATSAttempts"] == 1, "Should pass ATS on first try, never retry"
     assert final["ATSScore"] >= workflow_module.ATS_PASS_THRESHOLD

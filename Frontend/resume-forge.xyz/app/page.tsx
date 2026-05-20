@@ -1,14 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Navbar } from "@/components/navbar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { useAuth } from "@/lib/auth-context";
 
 export default function LandingPage() {
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const [jd, setJd] = useState("");
+
+  // Already-registered/logged-in users skip the landing page.
+  useEffect(() => {
+    if (!authLoading && user) router.replace("/dashboard");
+  }, [user, authLoading, router]);
 
   function handleTry() {
     router.push("/signin");

@@ -6,6 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
+import { connectLinkedin, listGithubRepos, githubLoginUrl, updateProfile, ApiError, type GithubRepo } from "@/lib/api";
+import { useAuth, needsOnboarding } from "@/lib/auth-context";
+import { RequireAuth } from "@/components/require-auth";
+import { toast } from "sonner";
 
 const steps = [
   {
@@ -53,25 +57,6 @@ const steps = [
   },
 ];
 
-/* ── Mock GitHub repos ── */
-const MOCK_REPOS = [
-  { id: 1, name: "resume-forge", lang: "TypeScript", stars: 42, updatedAt: "2d ago", desc: "AI-powered résumé tailoring tool" },
-  { id: 2, name: "design-system", lang: "TypeScript", stars: 18, updatedAt: "1w ago", desc: "Component library used by 20+ teams" },
-  { id: 3, name: "lcp-streaming-ssr", lang: "TypeScript", stars: 31, updatedAt: "2w ago", desc: "Next.js LCP optimisation with streaming SSR" },
-  { id: 4, name: "vercel-app-router", lang: "TypeScript", stars: 9, updatedAt: "3w ago", desc: "App Router migration experiments" },
-  { id: 5, name: "stripe-design-tokens", lang: "CSS", stars: 7, updatedAt: "1mo ago", desc: "Design token pipeline for Stripe-style UIs" },
-  { id: 6, name: "graphql-codegen-plugin", lang: "TypeScript", stars: 14, updatedAt: "1mo ago", desc: "Custom codegen plugin for typed hooks" },
-  { id: 7, name: "perf-audit-cli", lang: "JavaScript", stars: 5, updatedAt: "2mo ago", desc: "CLI tool for Lighthouse batch audits" },
-  { id: 8, name: "a11y-checker", lang: "TypeScript", stars: 11, updatedAt: "2mo ago", desc: "Automated accessibility checker for React" },
-  { id: 9, name: "monorepo-template", lang: "TypeScript", stars: 23, updatedAt: "3mo ago", desc: "Turborepo + pnpm starter with CI" },
-  { id: 10, name: "api-rate-limiter", lang: "Go", stars: 6, updatedAt: "4mo ago", desc: "Token bucket rate limiter middleware" },
-  { id: 11, name: "react-query-devtools", lang: "TypeScript", stars: 3, updatedAt: "4mo ago", desc: "Extended devtools for TanStack Query" },
-  { id: 12, name: "postgres-migrations", lang: "SQL", stars: 2, updatedAt: "5mo ago", desc: "Zero-downtime migration scripts" },
-  { id: 13, name: "cli-starter", lang: "Go", stars: 8, updatedAt: "6mo ago", desc: "Production-ready CLI scaffolding with Cobra" },
-  { id: 14, name: "dotfiles", lang: "Shell", stars: 1, updatedAt: "7mo ago", desc: "Personal dotfiles and shell config" },
-  { id: 15, name: "advent-of-code-2024", lang: "Python", stars: 0, updatedAt: "8mo ago", desc: "AoC 2024 solutions" },
-];
-
 const LANG_COLORS: Record<string, string> = {
   TypeScript: "#3178c6",
   JavaScript: "#f1e05a",
@@ -80,6 +65,13 @@ const LANG_COLORS: Record<string, string> = {
   CSS: "#563d7c",
   Shell: "#89e051",
   SQL: "#e38c00",
+  Rust: "#dea584",
+  Java: "#b07219",
+  "C++": "#f34b7d",
+  "C#": "#178600",
+  Ruby: "#701516",
+  Swift: "#F05138",
+  Kotlin: "#A97BFF",
 };
 
 /* ── GitHub step component ── */
@@ -87,38 +79,64 @@ function GitHubStep({
   selectedRepos,
   onSelectedChange,
 }: {
-  selectedRepos: number[];
-  onSelectedChange: (ids: number[]) => void;
+  selectedRepos: string[];
+  onSelectedChange: (repos: string[]) => void;
 }) {
-  const [phase, setPhase] = useState<"connect" | "loading" | "repos">("connect");
+  const [repos, setRepos] = useState<GithubRepo[]>([]);
+  const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
-  const [repoError, setRepoError] = useState(false);
+  const [githubUsername, setGithubUsername] = useState<string | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
 
-  function handleConnect() {
-    setPhase("loading");
-    setTimeout(() => setPhase("repos"), 1800);
-  }
+  useEffect(() => {
+    const username = typeof window !== "undefined" ? localStorage.getItem("github_username") : null;
+    const connected = typeof window !== "undefined" && localStorage.getItem("github_connected") === "1";
+    if (username) setGithubUsername(username);
+    if (connected) {
+      setIsConnected(true);
+      fetchRepos();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  function toggleRepo(id: number) {
-    setRepoError(false);
-    if (selectedRepos.includes(id)) {
-      onSelectedChange(selectedRepos.filter((r) => r !== id));
-    } else {
-      if (selectedRepos.length >= 10) return;
-      onSelectedChange([...selectedRepos, id]);
+  async function fetchRepos() {
+    setLoading(true);
+    try {
+      const data = await listGithubRepos();
+      setRepos(data);
+    } catch {
+      toast.error("Failed to load repos. Reconnect GitHub.");
+      setIsConnected(false);
+      localStorage.removeItem("github_connected");
+      localStorage.removeItem("github_username");
+    } finally {
+      setLoading(false);
     }
   }
 
-  const filtered = MOCK_REPOS.filter(
+  function handleConnect() {
+    window.location.href = githubLoginUrl();
+  }
+
+  function toggleRepo(fullName: string) {
+    if (selectedRepos.includes(fullName)) {
+      onSelectedChange(selectedRepos.filter((r) => r !== fullName));
+    } else {
+      if (selectedRepos.length >= 10) return;
+      onSelectedChange([...selectedRepos, fullName]);
+    }
+  }
+
+  const filtered = repos.filter(
     (r) =>
       r.name.toLowerCase().includes(search.toLowerCase()) ||
-      r.desc.toLowerCase().includes(search.toLowerCase())
+      r.description.toLowerCase().includes(search.toLowerCase())
   );
 
   const count = selectedRepos.length;
   const atMax = count >= 10;
 
-  if (phase === "connect") {
+  if (!isConnected) {
     return (
       <div className="flex flex-col gap-4 mb-6">
         <div className="border border-border rounded p-4 flex items-center gap-3">
@@ -127,7 +145,7 @@ function GitHubStep({
           </svg>
           <div>
             <p className="text-sm font-bold">GitHub OAuth</p>
-            <p className="text-xs text-muted-foreground">Read-only · public repos</p>
+            <p className="text-xs text-muted-foreground">Read-only · your repositories</p>
           </div>
         </div>
         <button
@@ -141,7 +159,7 @@ function GitHubStep({
     );
   }
 
-  if (phase === "loading") {
+  if (loading) {
     return (
       <div className="flex flex-col gap-3 mb-6">
         {[...Array(5)].map((_, i) => (
@@ -159,17 +177,14 @@ function GitHubStep({
     );
   }
 
-  /* repos phase */
   return (
     <div className="flex flex-col gap-3 mb-6">
-      {/* Connected badge */}
       <div className="flex items-center gap-2 mb-1">
         <span className="w-2 h-2 rounded-full bg-accent inline-block" />
-        <span className="text-xs font-mono text-accent font-bold">Connected · TheCoder30ec4</span>
-        <span className="text-xs text-muted-foreground font-mono">· {MOCK_REPOS.length} repos found</span>
+        <span className="text-xs font-mono text-accent font-bold">Connected · @{githubUsername}</span>
+        <span className="text-xs text-muted-foreground font-mono">· {repos.length} repos found</span>
       </div>
 
-      {/* Selection counter + hint */}
       <div className="flex items-center justify-between">
         <span className={`text-xs font-mono font-bold ${count < 2 ? "text-muted-foreground" : count === 10 ? "text-accent" : "text-foreground"}`}>
           {count} / 10 selected
@@ -187,7 +202,6 @@ function GitHubStep({
         )}
       </div>
 
-      {/* Search */}
       <input
         type="text"
         value={search}
@@ -196,19 +210,30 @@ function GitHubStep({
         className="w-full h-8 px-3 rounded-lg border border-border bg-card text-xs font-mono focus:outline-none focus:border-foreground transition-colors"
       />
 
-      {/* Repo list */}
       <div className="flex flex-col gap-1.5 max-h-72 overflow-y-auto pr-1">
         {filtered.length === 0 && (
           <p className="text-xs text-muted-foreground font-mono py-4 text-center">No repos match.</p>
         )}
         {filtered.map((repo) => {
-          const isSelected = selectedRepos.includes(repo.id);
+          const isSelected = selectedRepos.includes(repo.full_name);
           const isDisabled = atMax && !isSelected;
+          const pushedAgo = repo.pushed_at
+            ? (() => {
+                const diff = Date.now() - new Date(repo.pushed_at).getTime();
+                const d = Math.floor(diff / 86400000);
+                if (d === 0) return "today";
+                if (d === 1) return "1d ago";
+                if (d < 30) return `${d}d ago`;
+                const m = Math.floor(d / 30);
+                if (m < 12) return `${m}mo ago`;
+                return `${Math.floor(m / 12)}y ago`;
+              })()
+            : "";
           return (
             <button
-              key={repo.id}
+              key={repo.full_name}
               type="button"
-              onClick={() => !isDisabled && toggleRepo(repo.id)}
+              onClick={() => !isDisabled && toggleRepo(repo.full_name)}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border text-left transition-all duration-150 cursor-pointer ${
                 isSelected
                   ? "border-foreground bg-foreground/5"
@@ -217,7 +242,6 @@ function GitHubStep({
                   : "border-border hover:border-foreground/50"
               }`}
             >
-              {/* Checkbox */}
               <div className={`w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center transition-colors duration-150 ${
                 isSelected ? "bg-foreground border-foreground" : "border-border"
               }`}>
@@ -227,35 +251,24 @@ function GitHubStep({
                   </svg>
                 )}
               </div>
-
-              {/* Repo info */}
               <div className="flex-1 min-w-0">
-                <p className={`text-xs font-bold truncate ${isSelected ? "text-foreground" : "text-foreground"}`}>
-                  {repo.name}
-                </p>
-                <p className="text-[11px] text-muted-foreground truncate">{repo.desc}</p>
+                <p className="text-xs font-bold truncate">{repo.name}</p>
+                <p className="text-[11px] text-muted-foreground truncate">{repo.description || <span className="italic opacity-50">no description</span>}</p>
               </div>
-
-              {/* Meta */}
               <div className="flex items-center gap-2 flex-shrink-0">
-                <span className="flex items-center gap-1 text-[11px] text-muted-foreground font-mono">
-                  <span
-                    className="w-2 h-2 rounded-full inline-block"
-                    style={{ backgroundColor: LANG_COLORS[repo.lang] ?? "#888" }}
-                  />
-                  {repo.lang}
-                </span>
-                <span className="text-[11px] text-muted-foreground font-mono">★ {repo.stars}</span>
-                <span className="text-[11px] text-muted-foreground font-mono">{repo.updatedAt}</span>
+                {repo.language && (
+                  <span className="flex items-center gap-1 text-[11px] text-muted-foreground font-mono">
+                    <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: LANG_COLORS[repo.language] ?? "#888" }} />
+                    {repo.language}
+                  </span>
+                )}
+                <span className="text-[11px] text-muted-foreground font-mono">★ {repo.stargazers_count}</span>
+                <span className="text-[11px] text-muted-foreground font-mono">{pushedAgo}</span>
               </div>
             </button>
           );
         })}
       </div>
-
-      {repoError && (
-        <p className="text-xs text-red-500 font-mono">Select at least 2 repositories to continue.</p>
-      )}
 
       <p className="text-[11px] text-muted-foreground font-mono leading-relaxed">
         Only repos relevant to your JD will appear in the résumé — we pick the best evidence automatically.
@@ -541,9 +554,28 @@ function ExperienceStep({
 /* ── Main page ── */
 export default function OnboardingPage() {
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
+
+  // Redirect to dashboard if onboarding already complete
+  useEffect(() => {
+    if (!authLoading && user && !needsOnboarding()) {
+      router.replace("/dashboard");
+    }
+  }, [user, authLoading, router]);
+
   const [currentStep, setCurrentStep] = useState(0);
-  const [selectedRepos, setSelectedRepos] = useState<number[]>([]);
+  // Real repos stored as "owner/repo" strings
+  const [selectedRepos, setSelectedRepos] = useState<string[]>(() =>
+    JSON.parse(typeof window !== "undefined" ? localStorage.getItem("selected_repos") ?? "[]" : "[]")
+  );
   const [repoError, setRepoError] = useState(false);
+
+  // LinkedIn
+  const [linkedinUrl, setLinkedinUrl] = useState("");
+  const [linkedinLoading, setLinkedinLoading] = useState(false);
+  const [linkedinConnected, setLinkedinConnected] = useState(() =>
+    typeof window !== "undefined" && localStorage.getItem("linkedin_connected") === "1"
+  );
   const [apiKey, setApiKey] = useState("");
   const [apiPlan, setApiPlan] = useState<"byok" | "paid" | null>(null);
   const [showApiKey, setShowApiKey] = useState(false);
@@ -564,20 +596,50 @@ export default function OnboardingPage() {
   const [jdError, setJdError] = useState(false);
   const [completed, setCompleted] = useState<Set<number>>(new Set());
 
+  async function handleLinkedinConnect() {
+    if (!linkedinUrl.trim()) return;
+    setLinkedinLoading(true);
+    try {
+      await connectLinkedin(linkedinUrl.trim());
+      localStorage.setItem("linkedin_connected", "1");
+      setLinkedinConnected(true);
+      toast.success("LinkedIn connected!");
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Failed to connect LinkedIn.");
+    } finally {
+      setLinkedinLoading(false);
+    }
+  }
+
+  function handleReposChange(repos: string[]) {
+    setSelectedRepos(repos);
+    localStorage.setItem("selected_repos", JSON.stringify(repos));
+    if (repos.length >= 2) setRepoError(false);
+  }
+
   function handleNext() {
     const step = steps[currentStep];
     if (step.id === "authorize") {
       if (selectedRepos.length < 2) { setRepoError(true); return; }
       setRepoError(false);
+      localStorage.setItem("selected_repos", JSON.stringify(selectedRepos));
+    }
+    if (step.id === "experience") {
+      // Persist the Fresher flag — the resume workflow uses it to decide
+      // whether to include a work-experience section.
+      updateProfile({ is_fresher: isFresher }).catch(() => {});
     }
     if (step.id === "firstrun") {
       if (!jd.trim()) { setJdError(true); return; }
       setCompleted((prev) => new Set([...prev, currentStep]));
-      router.push("/running");
+      localStorage.setItem("onboarding_jd", jd);
+      router.push("/new");
       return;
     }
     setCompleted((prev) => new Set([...prev, currentStep]));
     if (currentStep >= steps.length - 1) {
+      // Mark onboarding complete
+      localStorage.setItem("onboarding_done", "1");
       router.push("/dashboard");
     } else {
       setCurrentStep((s) => s + 1);
@@ -652,25 +714,56 @@ export default function OnboardingPage() {
 
             {step.id === "authorize" && (
               <>
-                <GitHubStep
-                  selectedRepos={selectedRepos}
-                  onSelectedChange={(ids) => { setSelectedRepos(ids); if (ids.length >= 2) setRepoError(false); }}
-                />
+                <GitHubStep selectedRepos={selectedRepos} onSelectedChange={handleReposChange} />
                 {repoError && (
-                  <p className="text-xs text-red-500 font-mono -mt-3 mb-4">Select at least 2 repositories to continue.</p>
+                  <p className="text-xs text-red-500 font-mono mb-4">Select at least 2 repositories to continue.</p>
                 )}
               </>
             )}
 
             {step.id === "linkedin" && (
-              <div className="border border-border rounded p-4 mb-6 flex items-center gap-3">
-                <svg viewBox="0 0 24 24" className="w-5 h-5 flex-shrink-0" fill="#0A66C2">
-                  <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
-                </svg>
-                <div>
-                  <p className="text-sm font-bold">LinkedIn Import</p>
-                  <p className="text-xs text-muted-foreground">Profile, experience, recommendations</p>
-                </div>
+              <div className="flex flex-col gap-4 mb-6">
+                {linkedinConnected ? (
+                  <div className="border border-accent/40 bg-accent/5 rounded p-4 flex items-center gap-3">
+                    <svg viewBox="0 0 24 24" className="w-5 h-5 flex-shrink-0" fill="#0A66C2">
+                      <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
+                    </svg>
+                    <div>
+                      <p className="text-sm font-bold text-accent">✓ LinkedIn connected</p>
+                      <p className="text-xs text-muted-foreground">Profile will be pulled during resume generation</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-3">
+                    <div className="border border-border rounded p-4 flex items-center gap-3">
+                      <svg viewBox="0 0 24 24" className="w-5 h-5 flex-shrink-0" fill="#0A66C2">
+                        <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
+                      </svg>
+                      <div>
+                        <p className="text-sm font-bold">LinkedIn Import</p>
+                        <p className="text-xs text-muted-foreground">Paste your LinkedIn profile URL</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Input
+                        value={linkedinUrl}
+                        onChange={(e) => setLinkedinUrl(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter") handleLinkedinConnect(); }}
+                        placeholder="https://www.linkedin.com/in/yourname"
+                        className="font-mono text-xs h-9 flex-1"
+                      />
+                      <Button
+                        type="button"
+                        onClick={handleLinkedinConnect}
+                        disabled={linkedinLoading || !linkedinUrl.trim()}
+                        className="h-9 text-xs font-bold border-0 disabled:opacity-50"
+                        style={{ backgroundColor: "oklch(0.22 0.03 55)", color: "oklch(0.96 0.005 80)" }}
+                      >
+                        {linkedinLoading ? "…" : "Connect"}
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

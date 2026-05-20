@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Space_Mono } from "next/font/google";
 import "./globals.css";
+import { AuthProvider } from "@/lib/auth-context";
+import { Toaster } from "sonner";
 
 const spaceMono = Space_Mono({
   variable: "--font-space-mono",
@@ -21,7 +23,10 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${spaceMono.variable} h-full`}>
       <body className="min-h-full flex flex-col font-mono antialiased">
-        {children}
+        <AuthProvider>
+          {children}
+          <Toaster position="bottom-right" richColors closeButton />
+        </AuthProvider>
       </body>
     </html>
   );

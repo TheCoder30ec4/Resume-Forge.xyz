@@ -8,5 +8,21 @@ wheels/
 
 # Virtual environments
 .venv
+.venv_old/
 
 .env
+logs/
+
+# OS
+.DS_Store
+
+# Local repo backups / broken state
+.git.broken/
+
+# Generated output & local DB
+output/
+*.db
+
+# Node
+node_modules/
+.next/
