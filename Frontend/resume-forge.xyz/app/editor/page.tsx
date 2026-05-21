@@ -275,7 +275,7 @@ export default function EditorPage() {
   const [data, setData] = useState<ResumeData>(INITIAL_DATA);
   const [activeSection, setActiveSection] = useState("summary");
   const [atsScore] = useState(91);
-  const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
 
   function scrollToSection(id: string) {
     setActiveSection(id);

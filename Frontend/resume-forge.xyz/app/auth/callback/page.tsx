@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { getMe } from "@/lib/api";
 import { toast } from "sonner";
 
-export default function AuthCallbackPage() {
+function AuthCallback() {
   const router = useRouter();
   const params = useSearchParams();
   const { setTokens } = useAuth();
@@ -26,7 +26,6 @@ export default function AuthCallbackPage() {
       if (access && refresh) {
         const dest = await setTokens(access, refresh);
         toast.success("Signed in with Google!");
-        // New user (incomplete profile) → collect details first.
         try {
           const me = await getMe();
           const p = me.profile;
@@ -50,5 +49,19 @@ export default function AuthCallbackPage() {
     <div className="min-h-screen flex items-center justify-center">
       <p className="text-xs text-muted-foreground font-mono animate-pulse">Signing you in…</p>
     </div>
+  );
+}
+
+export default function AuthCallbackPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          <p className="text-xs text-muted-foreground font-mono animate-pulse">Signing you in…</p>
+        </div>
+      }
+    >
+      <AuthCallback />
+    </Suspense>
   );
 }

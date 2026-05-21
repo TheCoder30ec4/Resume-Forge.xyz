@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AppLayout } from "@/components/navbar";
 import { getSession, ResumeSession } from "@/lib/api";
@@ -14,7 +14,7 @@ const STAGES = [
   { id: "format",  label: "Formatting PDF",             detail: "applying theme" },
 ];
 
-export default function RunningPage() {
+function RunningInner() {
   const router = useRouter();
   const params = useSearchParams();
   const sessionId = params.get("session");
@@ -158,5 +158,13 @@ export default function RunningPage() {
         </div>
       </div>
     </AppLayout>
+  );
+}
+
+export default function RunningPage() {
+  return (
+    <Suspense fallback={null}>
+      <RunningInner />
+    </Suspense>
   );
 }

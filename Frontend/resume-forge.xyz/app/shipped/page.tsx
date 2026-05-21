@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   AlignLeft,
@@ -95,7 +95,7 @@ function sectionIcon(key: string): LucideIcon {
   return SECTION_ICONS[key.toLowerCase()] ?? FileText;
 }
 
-export default function ShippedPage() {
+function ShippedInner() {
   const router = useRouter();
   const params = useSearchParams();
   const sessionId = params.get("session");
@@ -436,6 +436,14 @@ export default function ShippedPage() {
         </div>
       </div>
     </AppLayout>
+  );
+}
+
+export default function ShippedPage() {
+  return (
+    <Suspense fallback={null}>
+      <ShippedInner />
+    </Suspense>
   );
 }
 
