@@ -2,6 +2,9 @@
 
 AI-powered, open-source resume builder. Generate, tailor, and export ATS-friendly resumes from your GitHub, LinkedIn, and a target job description — driven by an agentic workflow over LangGraph.
 
+<img width="1472" height="2360" alt="image" src="https://github.com/user-attachments/assets/1789899d-bedb-47ea-9835-6697fe096456" />
+
+
 ## Features
 
 - Job-description → tailored resume pipeline (gap analysis, ATS validation, verification)
